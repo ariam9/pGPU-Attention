@@ -256,8 +256,6 @@ def run_attention_kernel(Q, K, num_warps=4, device=None, debug=False):
     total_cycles = dev.launch(compiled, alloc_Q, alloc_K, alloc_A, float(B), float(H))
     tracer.export()
 
-    print(f"context switch cycles: {dev.smsp.total_context_switch_cycles}, total cycles: {total_cycles}")
-
     score = dev.dram_copy(alloc_A, direction=CopyDirection.D2H).reshape(B, H, Nq, Nk)
     return score, total_cycles
 

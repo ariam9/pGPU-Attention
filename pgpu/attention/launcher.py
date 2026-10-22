@@ -40,12 +40,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-B", "--batchs", type=int, default=1, help="batch size")
     parser.add_argument("-H", "--heads", type=int, default=1, help="number of heads")
-    parser.add_argument("--debug", type=bool, default=False, help="debug on/off")
+    parser.add_argument("--debug", action='store_true', help="debug on/off")
     args = parser.parse_args()
 
     B = args.batchs
     H = args.heads
-    debug = args.debug
+    debug = True if args.debug else False
 
     A, A_, num_cycles = launch_kernel(B, H, debug)
 
