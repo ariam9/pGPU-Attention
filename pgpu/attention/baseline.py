@@ -139,6 +139,8 @@ def compute_softmax(kb, sm_A):
 
 
 def baseline_attention_kernel(kb, r_base_Q, r_base_K, r_base_A, r_B, r_H):
+    kb.trace_start("baseline_attention_kernel")
+
     sm_Q1 = kb.sram.alloc("Q1", 128 * kb.num_warps)
     sm_Q2 = kb.sram.alloc("Q2", 128 * kb.num_warps)
     sm_K1 = kb.sram.alloc("K1", 128)
@@ -217,8 +219,10 @@ def baseline_attention_kernel(kb, r_base_Q, r_base_K, r_base_A, r_B, r_H):
         kb.asm("jmp", "work_loop_start")
         kb.label("work_loop_end")
 
+    kb.trace_end("baseline_attention_kernel")
 
-def run_attention_kernel(Q, K, num_warps=4, device=None, tracer=True, debug=False):
+
+def run_attention_kernel(Q, K, num_warps=4, device=None, debug=False):
     if len(Q.shape) != 4 or len(K.shape) != 2 or Q.shape[-1] != K.shape[-1]:
         raise ValueError("Invalid shape for Q or K")
 
@@ -247,13 +251,12 @@ def run_attention_kernel(Q, K, num_warps=4, device=None, tracer=True, debug=Fals
 
     compiled = build_kernel(baseline_attention_kernel, num_warps=num_warps, debug=debug)
 
-    if tracer:
-        tracer = KernelTracer("baseline_attention_trace")
-        tracer.attach(dev, compiled)
-        total_cycles = dev.launch(compiled, alloc_Q, alloc_K, alloc_A, float(B), float(H))
-        tracer.export()
-    else:
-        total_cycles = dev.launch(compiled, alloc_Q, alloc_K, alloc_A, float(B), float(H))
+    tracer = KernelTracer("baseline_attention_trace")
+    tracer.attach(dev, compiled)
+    total_cycles = dev.launch(compiled, alloc_Q, alloc_K, alloc_A, float(B), float(H))
+    tracer.export()
+
+    print(f"context switch cycles: {dev.smsp.total_context_switch_cycles}, total cycles: {total_cycles}")
 
     score = dev.dram_copy(alloc_A, direction=CopyDirection.D2H).reshape(B, H, Nq, Nk)
     return score, total_cycles

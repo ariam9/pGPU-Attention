@@ -20,7 +20,7 @@ def compare(A, A_, atol=1e-4, rtol=1e-3, max_fail_frac=0.001):
     return ok
 
 
-def launch_kernel(B=1, H=1, tracer=False, debug=False):
+def launch_kernel(B=1, H=1, debug=False):
     rng = np.random.default_rng(seed=42)
     Q = rng.random(size=(B, H, 8, 32), dtype=np.float32) * 100
     K = rng.random(size=(8, 32), dtype=np.float32) * 100
@@ -30,7 +30,7 @@ def launch_kernel(B=1, H=1, tracer=False, debug=False):
     exp_scores = np.exp(scores - max_scores)
     A = exp_scores / np.sum(exp_scores, axis=-1, keepdims=True)
 
-    A_, num_cycles = run_attention_kernel(Q, K, tracer=tracer, debug=debug)
+    A_, num_cycles = run_attention_kernel(Q, K, debug=debug)
 
     return A, A_, num_cycles
 
@@ -40,16 +40,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-B", "--batchs", type=int, default=1, help="batch size")
     parser.add_argument("-H", "--heads", type=int, default=1, help="number of heads")
-    parser.add_argument("--tracer", type=bool, default=False, help="tracer on/off")
     parser.add_argument("--debug", type=bool, default=False, help="debug on/off")
     args = parser.parse_args()
 
     B = args.batchs
     H = args.heads
-    tracer = args.tracer
     debug = args.debug
 
-    A, A_, num_cycles = launch_kernel(B, H, tracer, debug)
+    A, A_, num_cycles = launch_kernel(B, H, debug)
 
     print(f"Number of cycles: {num_cycles}")
     print(compare(A, A_))
