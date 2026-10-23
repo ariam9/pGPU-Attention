@@ -222,7 +222,7 @@ def baseline_attention_kernel(kb, r_base_Q, r_base_K, r_base_A, r_B, r_H):
 
         compute_attention_score(kb, r_Q1, r_K1, r_A)
         compute_attention_score(kb, r_Q2, r_K2, r_A)
-        scale_attention_score(kb, r_A, 0.17677669)
+        scale_attention_score(kb, r_A, float(1/np.sqrt(32)))
         compute_softmax(kb, r_A)
 
         #writing A to DRAM
