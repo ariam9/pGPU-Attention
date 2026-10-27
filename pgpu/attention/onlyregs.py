@@ -5,6 +5,8 @@ from pgpu.sw.kernel import build_kernel
 from pgpu.devtools.kernel_tracer import KernelTracer
 
 def onlyregs_attention_kernel(kb, r_base_Q, r_base_K, r_base_A, r_B, r_H):
+    kb.trace_start("onlyregs_attention_kernel")
+
     #64 words of SRAM per warp to compute softmax reductions
     sm_scratch = kb.sram.alloc("scratch", 64 * kb.num_warps)
 
@@ -215,11 +217,13 @@ def onlyregs_attention_kernel(kb, r_base_Q, r_base_K, r_base_A, r_B, r_H):
 
         #going to next batch
         kb.label("next_batch")
-        kb.asm("add", r_b, r_b, r_1)
+        kb.asm("add", r_b, r_b, kb.sr_numwarps)
         kb.asm("jmp", "batch_loop")
 
 
         kb.label("kernel_end")
+
+        kb.trace_end("onlyregs_attention_kernel")
 
 
 def run_attention_kernel(Q, K, num_warps=4, device=None, debug=False, tracing=False):
@@ -252,7 +256,7 @@ def run_attention_kernel(Q, K, num_warps=4, device=None, debug=False, tracing=Fa
     compiled = build_kernel(onlyregs_attention_kernel, num_warps=num_warps, debug=debug)
 
     if tracing:
-        tracer = KernelTracer("baseline_attention_trace")
+        tracer = KernelTracer("onlyregs_attention_trace")
         tracer.attach(dev, compiled)
         total_cycles = dev.launch(compiled, alloc_Q, alloc_K, alloc_A, float(B), float(H))
         tracer.export()

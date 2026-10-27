@@ -167,65 +167,68 @@ def apply_context_switch(scheduler, old_warp_id: int, new_warp_id: int) -> int:
     from pgpu.arch.smsp import RegisterFile
     from pgpu.arch.memory import MemoryAllocation
 
-    if scheduler.sram is not None and "__context_save__" not in scheduler.sram.allocations:
-        scheduler.sram.alloc(
-            name="__context_save__",
-            size=scheduler.total_warps * WARP_CONTEXT_WORDS,
-        )
+    #REMOVING LEGACY SRAM-SAVING CONTEXT SWITCHES
+    # if scheduler.sram is not None and "__context_save__" not in scheduler.sram.allocations:
+    #     scheduler.sram.alloc(
+    #         name="__context_save__",
+    #         size=scheduler.total_warps * WARP_CONTEXT_WORDS,
+    #     )
+    #
+    # start_cycle = scheduler.current_cycle
+    # curr_time = scheduler.current_cycle
+    #
+    # # 1. Context Save: pipelined store of registers of old_warp_id to SRAM
+    # save_ops = emit_context_save_instructions(scheduler, old_warp_id)
+    # max_save_comp = curr_time
+    # old_warp = scheduler.get_warp(old_warp_id) if hasattr(scheduler, 'get_warp') else scheduler.warps[old_warp_id]
+    # for instr, addrs, vals in save_ops:
+    #     curr_time = max(curr_time, scheduler.sram.next_available_store_cycle)
+    #     state, comp, tokens = scheduler.sram.store(
+    #         addrs, vals, current_cycle=curr_time, warp_id=old_warp_id
+    #     )
+    #     instr.completion_time = comp
+    #     if getattr(scheduler, 'trace_hook', None) is not None:
+    #         # Pass the current PC of the warp so it stays within the trace region bounds
+    #         scheduler.trace_hook(old_warp_id, old_warp.pc, instr, curr_time)
+    #     if tokens:
+    #         scheduler.sram.InstrRetireRoutine(old_warp_id, tokens)
+    #     if comp > max_save_comp:
+    #         max_save_comp = comp
+    # curr_time = max(curr_time, max_save_comp)
+    #
+    # # 2. Context Restore: pipelined load of registers of new_warp_id from SRAM
+    # warp_in = scheduler.get_warp(new_warp_id) if hasattr(scheduler, 'get_warp') else scheduler.warps[new_warp_id]
+    # restore_ops = emit_context_restore_instructions(scheduler, new_warp_id)
+    # max_restore_comp = curr_time
+    # for instr, addrs in restore_ops:
+    #     curr_time = max(curr_time, scheduler.sram.next_available_load_cycle)
+    #     state, comp, tokens, results = scheduler.sram.load(
+    #         addrs, current_cycle=curr_time, warp_id=new_warp_id
+    #     )
+    #     instr.completion_time = comp
+    #     if getattr(scheduler, 'trace_hook', None) is not None:
+    #         scheduler.trace_hook(new_warp_id, warp_in.pc, instr, curr_time)
+    #     if tokens:
+    #         scheduler.sram.InstrRetireRoutine(new_warp_id, tokens)
+    #     if results is not None:
+    #         reg_id = instr.dest[0]
+    #         from pgpu.arch.smsp import RegisterFile
+    #         if reg_id < RegisterFile.NUM_VECTOR_REGS:
+    #             warp_in.regs[reg_id] = results
+    #         elif RegisterFile.PRED_BASE_ID <= reg_id < RegisterFile.PRED_BASE_ID + RegisterFile.NUM_PRED_REGS:
+    #             pred_idx = reg_id - RegisterFile.PRED_BASE_ID
+    #             warp_in.preds[pred_idx] = (results != 0.0)
+    #     if comp > max_restore_comp:
+    #         max_restore_comp = comp
+    # curr_time = max(curr_time, max_restore_comp)
+    #
+    # if hasattr(warp_in, "saved_skipped_regs"):
+    #     warp_in.saved_skipped_regs.clear()
+    #
+    # total_cost = max(curr_time - start_cycle, 0)
+    #return total_cost
 
-    start_cycle = scheduler.current_cycle
-    curr_time = scheduler.current_cycle
-
-    # 1. Context Save: pipelined store of registers of old_warp_id to SRAM
-    save_ops = emit_context_save_instructions(scheduler, old_warp_id)
-    max_save_comp = curr_time
-    old_warp = scheduler.get_warp(old_warp_id) if hasattr(scheduler, 'get_warp') else scheduler.warps[old_warp_id]
-    for instr, addrs, vals in save_ops:
-        curr_time = max(curr_time, scheduler.sram.next_available_store_cycle)
-        state, comp, tokens = scheduler.sram.store(
-            addrs, vals, current_cycle=curr_time, warp_id=old_warp_id
-        )
-        instr.completion_time = comp
-        if getattr(scheduler, 'trace_hook', None) is not None:
-            # Pass the current PC of the warp so it stays within the trace region bounds
-            scheduler.trace_hook(old_warp_id, old_warp.pc, instr, curr_time)
-        if tokens:
-            scheduler.sram.InstrRetireRoutine(old_warp_id, tokens)
-        if comp > max_save_comp:
-            max_save_comp = comp
-    curr_time = max(curr_time, max_save_comp)
-
-    # 2. Context Restore: pipelined load of registers of new_warp_id from SRAM
-    warp_in = scheduler.get_warp(new_warp_id) if hasattr(scheduler, 'get_warp') else scheduler.warps[new_warp_id]
-    restore_ops = emit_context_restore_instructions(scheduler, new_warp_id)
-    max_restore_comp = curr_time
-    for instr, addrs in restore_ops:
-        curr_time = max(curr_time, scheduler.sram.next_available_load_cycle)
-        state, comp, tokens, results = scheduler.sram.load(
-            addrs, current_cycle=curr_time, warp_id=new_warp_id
-        )
-        instr.completion_time = comp
-        if getattr(scheduler, 'trace_hook', None) is not None:
-            scheduler.trace_hook(new_warp_id, warp_in.pc, instr, curr_time)
-        if tokens:
-            scheduler.sram.InstrRetireRoutine(new_warp_id, tokens)
-        if results is not None:
-            reg_id = instr.dest[0]
-            from pgpu.arch.smsp import RegisterFile
-            if reg_id < RegisterFile.NUM_VECTOR_REGS:
-                warp_in.regs[reg_id] = results
-            elif RegisterFile.PRED_BASE_ID <= reg_id < RegisterFile.PRED_BASE_ID + RegisterFile.NUM_PRED_REGS:
-                pred_idx = reg_id - RegisterFile.PRED_BASE_ID
-                warp_in.preds[pred_idx] = (results != 0.0)
-        if comp > max_restore_comp:
-            max_restore_comp = comp
-    curr_time = max(curr_time, max_restore_comp)
-
-    if hasattr(warp_in, "saved_skipped_regs"):
-        warp_in.saved_skipped_regs.clear()
-
-    total_cost = max(curr_time - start_cycle, 0)
-    return total_cost
+    return 0
 
 
 # Backwards compatibility alias
