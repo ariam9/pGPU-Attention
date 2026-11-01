@@ -37,6 +37,8 @@ from pgpu.arch.smsp import (
     SIMD_WIDTH,
 )
 
+from pgpu.sw.scheduler import schedule_kernel
+
 if TYPE_CHECKING:
     from pgpu.arch.memory import MemoryAllocation
 
@@ -714,6 +716,7 @@ def build_kernel(
     kernel_fn: Callable[..., None],
     num_warps: int = 4,
     debug: bool = False,
+    schedule: bool = False
 ) -> CompiledKernel:
     """
     Compile a high-level user kernel function into an executable CompiledKernel.
@@ -762,11 +765,18 @@ def build_kernel(
                 raise KeyError(f"Unresolved jump label {instr.imm!r}.")
             instr.imm = kb.labels[instr.imm]
 
+    #wiring for instruction scheduler
+    instructions = kb.instructions
+    labels = kb.labels
+    trace_regions = kb.trace_regions
+    if schedule:
+        instructions, labels, trace_regions = schedule_kernel(instructions, labels, trace_regions)
+
     compiled = CompiledKernel(
-        instructions=kb.instructions,
+        instructions=instructions,
         sram_interface=kb.sram,
         arg_names=arg_names,
         sram_bindings=list(kb.sram.sram_bindings),
-        trace_regions=kb.trace_regions,
+        trace_regions=trace_regions,
     )
     return compiled

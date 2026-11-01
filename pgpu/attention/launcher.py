@@ -21,7 +21,7 @@ def compare(A, A_, atol=1e-4, rtol=1e-3, max_fail_frac=0.001):
     return ok
 
 
-def launch_kernel(B, H, W, debug=False, tracing=False):
+def launch_kernel(B, H, W, debug=False, tracing=False, schedule=False):
     rng = np.random.default_rng(seed=42)
     Q = rng.random(size=(B, H, 8, 32), dtype=np.float32) * 100
     K = rng.random(size=(B, 8, 32), dtype=np.float32) * 100
@@ -32,7 +32,7 @@ def launch_kernel(B, H, W, debug=False, tracing=False):
     exp_scores = np.exp(scores - max_scores)
     A = exp_scores / np.sum(exp_scores, axis=-1, keepdims=True)
 
-    A_, num_cycles = onlyregs_kernel(Q, K, num_warps=W, debug=debug, tracing=tracing)
+    A_, num_cycles = onlyregs_kernel(Q, K, num_warps=W, debug=debug, tracing=tracing, schedule=schedule)
 
     return A, A_, num_cycles
 
@@ -45,6 +45,7 @@ if __name__ == "__main__":
     parser.add_argument("-W", "--warps", type=int, default=4, help="number of warps")
     parser.add_argument("--debug", action='store_true', help="debug on/off")
     parser.add_argument("--tracer", action='store_true', help="tracer on/off")
+    parser.add_argument("--schedule", action="store_true", help="scheduler on/off")
     args = parser.parse_args()
 
     B = args.batchs
@@ -52,8 +53,9 @@ if __name__ == "__main__":
     W = args.warps
     debug = True if args.debug else False
     tracing = True if args.tracer else False
+    schedule = True if args.schedule else False
 
-    A, A_, num_cycles = launch_kernel(B, H, W, debug, tracing)
+    A, A_, num_cycles = launch_kernel(B, H, W, debug, tracing, schedule)
 
     print(f"Number of cycles: {num_cycles}")
     print(compare(A, A_))

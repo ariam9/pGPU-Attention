@@ -249,7 +249,7 @@ def baseline_attention_kernel(kb, r_base_Q, r_base_K, r_base_A, r_B, r_H):
     #kb.trace_end("baseline_attention_kernel")
 
 
-def run_attention_kernel(Q, K, num_warps=4, device=None, debug=False, tracing=False):
+def run_attention_kernel(Q, K, num_warps=4, device=None, debug=False, tracing=False, schedule=False):
     if len(Q.shape) != 4 or len(K.shape) != 3 or Q.shape[-1] != K.shape[-1] or Q.shape[0] != K.shape[0]:
         raise ValueError("Invalid shape for Q or K")
 
@@ -276,7 +276,7 @@ def run_attention_kernel(Q, K, num_warps=4, device=None, debug=False, tracing=Fa
     dev.dram_copy(alloc_Q, Q_arr.ravel(), direction=CopyDirection.H2D)
     dev.dram_copy(alloc_K, K_arr.ravel(), direction=CopyDirection.H2D)
 
-    compiled = build_kernel(baseline_attention_kernel, num_warps=num_warps, debug=debug)
+    compiled = build_kernel(baseline_attention_kernel, num_warps=num_warps, debug=debug, schedule=schedule)
 
     if tracing:
         tracer = KernelTracer("baseline_attention_trace")
