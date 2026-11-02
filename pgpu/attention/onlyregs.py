@@ -223,7 +223,7 @@ def onlyregs_attention_kernel(kb, r_base_Q, r_base_K, r_base_A, r_B, r_H):
 
         kb.label("kernel_end")
 
-        kb.trace_end("onlyregs_attention_kernel")
+    kb.trace_end("onlyregs_attention_kernel")
 
 
 def run_attention_kernel(Q, K, num_warps=4, device=None, debug=False, tracing=False, schedule=False):

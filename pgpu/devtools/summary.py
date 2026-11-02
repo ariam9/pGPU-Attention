@@ -87,7 +87,13 @@ def summarise_trace(file_path, top_bubbles=8):
         print(f"\n{'PIPELINE BUBBLES':<45}")
         print(f"{'GAP (CYCLES)':<14} | {'COUNT':>10} | {'TOTAL DEAD CYCLES':>18} | {'PRIMARY CULPRIT':<25}")
         print("-" * 75)
-        for gap, count in Counter(gaps).most_common(top_bubbles):
+
+        counter = Counter(gaps)
+
+        if top_bubbles == -1:
+            top_bubbles = len(counter)
+
+        for gap, count in counter.most_common(top_bubbles):
             if gap > 1:
                 dead_cyc = (gap - 1) * count
                 top_culprit = gap_culprits[gap].most_common(1)[0][0]

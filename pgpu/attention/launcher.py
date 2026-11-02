@@ -2,6 +2,7 @@ import numpy as np
 
 from pgpu.attention.baseline import run_attention_kernel as baseline_kernel
 from pgpu.attention.onlyregs import run_attention_kernel as onlyregs_kernel
+from pgpu.attention.onlyregs_softmax import run_attention_kernel as onlyregs_sf_kernel
 
 def compare(A, A_, atol=1e-4, rtol=1e-3, max_fail_frac=0.001):
     diff = np.abs(A - A_)
@@ -32,7 +33,7 @@ def launch_kernel(B, H, W, debug=False, tracing=False, schedule=False):
     exp_scores = np.exp(scores - max_scores)
     A = exp_scores / np.sum(exp_scores, axis=-1, keepdims=True)
 
-    A_, num_cycles = onlyregs_kernel(Q, K, num_warps=W, debug=debug, tracing=tracing, schedule=schedule)
+    A_, num_cycles = onlyregs_sf_kernel(Q, K, num_warps=W, debug=debug, tracing=tracing, schedule=schedule)
 
     return A, A_, num_cycles
 
