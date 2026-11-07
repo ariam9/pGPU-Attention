@@ -51,6 +51,7 @@ python -m pgpu.devtools.summary artifacts/traces/onlyregs_softmax_B1_H1_W1_sched
 ```
 
 Find [here](analysis.md) my analysis for the project!
+
 See [the project description](docs/ATTENTION_ASM.md) for architecture and ISA details. 
 
 Original simulator and documentation by Arjun Vadakkeveedu
