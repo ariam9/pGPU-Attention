@@ -41,6 +41,12 @@ def onlyregs_sf_attention_kernel(kb, r_base_Q, r_base_K, r_base_A, r_B, r_H):
         p_tmp = scope.alloc_pred("p_tmp")
 
 
+        #half predicate
+        kb.asm("set.imm", r_tmp1, 16.0)
+        p_lo = scope.alloc_pred("p_lo")
+        kb.asm("cmp.lt", p_lo, kb.sr_laneid, r_tmp1)
+
+
         #calculating offset of a thread/lane for loading from dram
         r_quad_off = scope.alloc("quad_off")
         r_row = scope.alloc("row")
@@ -167,9 +173,20 @@ def onlyregs_sf_attention_kernel(kb, r_base_Q, r_base_K, r_base_A, r_B, r_H):
 
 
         #writing attention scores to dram(from d0 and d1 registers)
-        kb.asm("add", r_tmp1, r_A_addr, kb.sr_laneid)
+        #alternating writes to 2 sets of 32 words to decrease sequentiality
+        kb.asm("mov", r_tmp1, d_regs[0])
+        kb.asm("mov", d_regs[0], d_regs[1], pred=p_lo, pred_inv=True)
+        kb.asm("mov", d_regs[1], r_tmp1, pred=p_lo, pred_inv=True)
+
+        kb.asm("mov", r_tmp2, kb.sr_laneid)
+        kb.asm("add", r_tmp2, r_tmp2, r_32, pred=p_lo, pred_inv=True)
+        kb.asm("add", r_tmp3, kb.sr_laneid, r_32)
+        kb.asm("mov", r_tmp3, kb.sr_laneid, pred=p_lo, pred_inv=True)
+
+        kb.asm("add", r_tmp1, r_A_addr, r_tmp2)
         kb.asm("dram.st", r_tmp1, d_regs[0])
-        kb.asm("add", r_tmp1, r_tmp1, r_32)
+
+        kb.asm("add", r_tmp1, r_A_addr, r_tmp3)
         kb.asm("dram.st", r_tmp1, d_regs[1])
 
 
