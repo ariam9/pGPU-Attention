@@ -54,5 +54,5 @@ Find [here](analysis.md) my analysis for the project!
 
 See [the project description](docs/ATTENTION_ASM.md) for architecture and ISA details. 
 
-Original simulator and documentation by Arjun Vadakkeveedu
+Original simulator and documentation by Arjun Menon Vadakkeveedu
 ([upstream pGPU](https://github.com/arjunmenonv/pGPU)).
