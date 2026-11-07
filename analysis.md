@@ -17,7 +17,7 @@ operation count is:
 
 ```text
 FLOPs = 4480 * B * H
-4480 = 2048 * 2 + 64 * 6    [matmul + softmax]
+4480 = 2048 * 2 + 64 * 6 [matmul + softmax]
 ```
 
 loads and stores are independent and can overlap. since the stores are less, the estimate uses only the loads:
@@ -124,7 +124,7 @@ this removes SRAM use entirely!
 
 the reduction from `onlyregs` to `onlyregs_softmax` is around 800k cycles, with the extra difference beyond the SRAM estimate possibly coming from other latency effects.
 
-the workload recorded for these measurements is **B = 64, H = 16**:
+the workload recorded for these measurements is **B = 16, H = 64**:
 
 | Warps | Without v1 scheduler | With v1 scheduler |
 | --- | ---: | ---: |
@@ -152,16 +152,16 @@ v1 is a basic list scheduler. it divides the program into straight-line blocks a
 
 it doesn't rename registers or look at the addresses of DRAM/SRAM memory operations yet, so there's room for improvement.
 
-the latency assumptions are:
+the latency assumptions(for the priority heuristic) are:
 
 | Dependence | Latency / reason |
 | --- | --- |
 | Register RAW | Producer latency |
 | Register WAW | Previous producer latency: issue waits for the previous write |
 | Register WAR | 1 cycle: read operands are latched on issue |
-| Memory RAW | Producer latency: fixed at 90 for now due to no forwarding |
+| Memory RAW | Producer latency: 14 cycles for SRAM, 90 for DRAM |
 | Memory WAW | 1 cycle: in-order store queue |
-| Memory WAR | Producer latency |
+| Memory WAR | 1 cycle: due to issue order preservation |
 
 VALU, TRANS and MMA are non-pipelined and each has one issue slot. the scheduler doesn't account for this currently. 
 

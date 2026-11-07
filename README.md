@@ -30,8 +30,7 @@ python -m pgpu.attention.launcher --kernel onlyregs_softmax -B 16 -H 64 -W 4
 
 Available kernels are: `baseline`, `onlyregs`, and `onlyregs_softmax`, each is a product of successive iteration.
 
-Add `--schedule` to enable instruction
-reordering, by a custom scheduling engine which should hopefully decrease cycle counts under the specificed workloads. It is off by default. 
+Add `--schedule` to enable instruction reordering, by a custom scheduling engine which should hopefully decrease cycle counts under the specified workloads. It is off by default. 
 
 Use `--help` for input controls and other options.
 
@@ -51,8 +50,8 @@ python -m pgpu.attention.launcher --kernel onlyregs_softmax -B 1 -H 1 -W 1 --tra
 python -m pgpu.devtools.summary artifacts/traces/onlyregs_softmax_B1_H1_W1_schedule0.json
 ```
 
-See [the project description](docs/ATTENTION_ASM.md) for architecture and ISA
-details. 
+Find [here](analysis.md) my analysis for the project!
+See [the project description](docs/ATTENTION_ASM.md) for architecture and ISA details. 
 
 Original simulator and documentation by Arjun Vadakkeveedu
 ([upstream pGPU](https://github.com/arjunmenonv/pGPU)).

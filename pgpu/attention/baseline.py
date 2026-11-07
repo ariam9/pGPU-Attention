@@ -140,7 +140,7 @@ def compute_softmax(kb, sm_A):
 
 
 def baseline_attention_kernel(kb, r_base_Q, r_base_K, r_base_A, r_B, r_H):
-    #kb.trace_start("baseline_attention_kernel")
+    kb.trace_start("baseline_attention_kernel")
 
     sm_Q1 = kb.sram.alloc("Q1", 128 * kb.num_warps)
     sm_Q2 = kb.sram.alloc("Q2", 128 * kb.num_warps)
@@ -247,7 +247,7 @@ def baseline_attention_kernel(kb, r_base_Q, r_base_K, r_base_A, r_B, r_H):
 
         kb.label("kernel_end")
 
-    #kb.trace_end("baseline_attention_kernel")
+    kb.trace_end("baseline_attention_kernel")
 
 
 def run_attention_kernel(Q, K, num_warps=4, device=None, debug=False, tracing=False, schedule=False, trace_dir="artifacts/traces"):
