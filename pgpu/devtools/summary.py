@@ -3,7 +3,7 @@ import argparse
 from collections import defaultdict, Counter
 
 def summarise_trace(file_path, top_bubbles=8):
-    with open(args.file_path) as f:
+    with open(file_path) as f:
         events = json.load(f)['traceEvents']
 
     by_proc = {}
@@ -106,7 +106,7 @@ if __name__ == "__main__":
         description="summary - summarise a kernel trace",
         formatter_class=argparse.RawTextHelpFormatter,
     )
-    parser.add_argument("file_path", nargs="?", help="Path to the trace file")
+    parser.add_argument("file_path", help="Path to the trace file")
     parser.add_argument(
         "--bubbles",
         type=int,

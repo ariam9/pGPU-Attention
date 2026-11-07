@@ -1,63 +1,97 @@
+import argparse
+import importlib
+from pathlib import Path
+
 import numpy as np
 
-from pgpu.attention.baseline import run_attention_kernel as baseline_kernel
-from pgpu.attention.onlyregs import run_attention_kernel as onlyregs_kernel
-from pgpu.attention.onlyregs_softmax import run_attention_kernel as onlyregs_sf_kernel
+from pgpu.attention.common import comparison_metrics, reference_attention
+
+
+def list_kernels():
+    #discover kernels
+    names = []
+    for path in sorted(Path(__file__).parent.glob("*.py")):
+        if path.stem.startswith("_") or path.stem == "launcher":
+            continue
+        module = importlib.import_module(f"pgpu.attention.{path.stem}")
+        if callable(getattr(module, "run_attention_kernel", None)):
+            names.append(path.stem)
+    return names
+
+
+def load_kernel(name):
+    if name.endswith(".py"):
+        name = name[:-3]
+    if not name.isidentifier() or name not in list_kernels():
+        raise ValueError(f"Unknown attention kernel {name!r}. Choose from: {', '.join(list_kernels())}")
+    return importlib.import_module(f"pgpu.attention.{name}").run_attention_kernel
+
 
 def compare(A, A_, atol=1e-4, rtol=1e-3, max_fail_frac=0.001):
-    diff = np.abs(A - A_)
-    tol = atol + rtol * np.abs(A)
-    fail_mask = diff > tol
-    n_fail = int(fail_mask.sum())
-    frac_fail = n_fail / A.size
-    max_diff = float(diff.max())
-
-    ok = frac_fail <= max_fail_frac
-    status = "PASS" if ok else "FAIL"
-    print(f"{status}: {n_fail}/{A.size} elements ({frac_fail:.4%}) exceed tol "
-          f"(atol={atol}, rtol={rtol}), max diff={max_diff:.3e}")
-    if n_fail:
-        worst = np.unravel_index(np.argmax(diff), diff.shape)
-        print(f"  worst element at {worst}: expected={A[worst]:.6f} got={A_[worst]:.6f}")
-    return ok
+    metrics = comparison_metrics(A, A_, atol, rtol, max_fail_frac)
+    status = "PASS" if metrics["passed"] else "FAIL"
+    print(f"{status}: {metrics['n_fail']}/{metrics['size']} elements "
+          f"({metrics['fail_fraction']:.4%}) exceed tol "
+          f"(atol={atol}, rtol={rtol}), max diff={metrics['max_abs_error']:.3e}")
+    if metrics["reason"]:
+        print(f"  {metrics['reason']}")
+    return metrics["passed"]
 
 
-def launch_kernel(B, H, W, debug=False, tracing=False, schedule=False):
-    rng = np.random.default_rng(seed=42)
-    Q = rng.random(size=(B, H, 8, 32), dtype=np.float32) * 100
-    K = rng.random(size=(B, 8, 32), dtype=np.float32) * 100
+def launch_kernel(B, H, W, debug=False, tracing=False, schedule=False, kernel="onlyregs_softmax", seed=42, input_scale=100.0, trace_dir="artifacts/traces"):
+    if min(B, H, W) <= 0:
+        raise ValueError("B, H, and W must be positive")
+    if not np.isfinite(input_scale) or input_scale < 0:
+        raise ValueError("input_scale must be finite and nonnegative")
+    if seed < 0:
+        raise ValueError("seed must be nonnegative")
+    run = load_kernel(kernel)
+    rng = np.random.default_rng(seed=seed)
+    Q = rng.random(size=(B, H, 8, 32), dtype=np.float32) * input_scale
+    K = rng.random(size=(B, 8, 32), dtype=np.float32) * input_scale
+    expected = reference_attention(Q, K)
+    actual, cycles = run(Q, K, num_warps=W, debug=debug, tracing=tracing,
+                         schedule=schedule, trace_dir=trace_dir)
+    return expected, actual, cycles
 
-    KT = K[:, None, :, :].swapaxes(-1, -2)
-    scores = (Q @ KT) * (1 / np.sqrt(32)).astype(np.float32)
-    max_scores = np.max(scores, axis=-1, keepdims=True)
-    exp_scores = np.exp(scores - max_scores)
-    A = exp_scores / np.sum(exp_scores, axis=-1, keepdims=True)
 
-    A_, num_cycles = onlyregs_sf_kernel(Q, K, num_warps=W, debug=debug, tracing=tracing, schedule=schedule)
+def positive_int(value):
+    number = int(value)
+    if number <= 0:
+        raise argparse.ArgumentTypeError("must be positive")
+    return number
 
-    return A, A_, num_cycles
+
+def main(argv=None):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--kernel", default="onlyregs_softmax", help="kernel filename or module stem")
+    parser.add_argument("--list-kernels", action="store_true")
+    parser.add_argument("-B", "--batches", "--batchs", type=positive_int, default=1)
+    parser.add_argument("-H", "--heads", type=positive_int, default=1)
+    parser.add_argument("-W", "--warps", type=positive_int, default=4)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--input-scale", type=float, default=100.0)
+    parser.add_argument("--debug", action="store_true")
+    parser.add_argument("--trace", "--tracer", dest="tracing", action="store_true")
+    parser.add_argument("--trace-dir", default="artifacts/traces")
+    parser.add_argument("--schedule", action="store_true", help="enable instruction scheduler")
+    args = parser.parse_args(argv)
+    if args.list_kernels:
+        print("\n".join(list_kernels()))
+        return 0
+    try:
+        expected, actual, cycles = launch_kernel(
+            args.batches, args.heads, args.warps, args.debug, args.tracing, args.schedule,
+            args.kernel, args.seed, args.input_scale, args.trace_dir,
+        )
+    except (ValueError, MemoryError) as exc:
+        parser.error(str(exc))
+    print(f"Kernel: {args.kernel.removesuffix('.py')}")
+    print(f"B={args.batches} H={args.heads} W={args.warps} N=8 d=32 "
+          f"seed={args.seed} input_scale={args.input_scale:g} schedule={args.schedule}")
+    print(f"Number of cycles: {cycles}")
+    return 0 if compare(expected, actual) else 1
 
 
 if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-B", "--batchs", type=int, default=1, help="batch size")
-    parser.add_argument("-H", "--heads", type=int, default=1, help="number of heads")
-    parser.add_argument("-W", "--warps", type=int, default=4, help="number of warps")
-    parser.add_argument("--debug", action='store_true', help="debug on/off")
-    parser.add_argument("--tracer", action='store_true', help="tracer on/off")
-    parser.add_argument("--schedule", action="store_true", help="scheduler on/off")
-    args = parser.parse_args()
-
-    B = args.batchs
-    H = args.heads
-    W = args.warps
-    debug = True if args.debug else False
-    tracing = True if args.tracer else False
-    schedule = True if args.schedule else False
-
-    A, A_, num_cycles = launch_kernel(B, H, W, debug, tracing, schedule)
-
-    print(f"Number of cycles: {num_cycles}")
-    print(compare(A, A_))
-
+    raise SystemExit(main())

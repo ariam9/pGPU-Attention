@@ -3,6 +3,7 @@ import numpy as np
 from pgpu.arch.gpu_device import pGPU, CopyDirection
 from pgpu.sw.kernel import build_kernel
 from pgpu.devtools.kernel_tracer import KernelTracer
+from pgpu.attention.common import validate_inputs, trace_output_base
 
 def onlyregs_sf_attention_kernel(kb, r_base_Q, r_base_K, r_base_A, r_B, r_H):
     kb.trace_start("onlyregs_sf_attention_kernel")
@@ -207,18 +208,10 @@ def onlyregs_sf_attention_kernel(kb, r_base_Q, r_base_K, r_base_A, r_B, r_H):
     kb.trace_end("onlyregs_sf_attention_kernel")
 
 
-def run_attention_kernel(Q, K, num_warps=4, device=None, debug=False, tracing=False, schedule=False):
-    if len(Q.shape) != 4 or len(K.shape) != 3 or Q.shape[-1] != K.shape[-1] or Q.shape[0] != K.shape[0]:
-        raise ValueError("Invalid shape for Q or K")
-
+def run_attention_kernel(Q, K, num_warps=4, device=None, debug=False, tracing=False, schedule=False, trace_dir="artifacts/traces"):
+    Q, K = validate_inputs(Q, K, num_warps, device)
     B, H, Nq, d = Q.shape
-    B, Nk, _ = K.shape
-
-    #following problem shapes exactly for now
-    if Nq != 8 or Nk != 8:
-        raise ValueError("Expected attention score matrix dimensions to be multiples of 8")
-    if d != 32:
-        raise ValueError("Expected token dimension to be multiple of 16")
+    _, Nk, _ = K.shape
 
     attention_size = B*H*Nq*Nk
 
@@ -237,7 +230,7 @@ def run_attention_kernel(Q, K, num_warps=4, device=None, debug=False, tracing=Fa
     compiled = build_kernel(onlyregs_sf_attention_kernel, num_warps=num_warps, debug=debug, schedule=schedule)
 
     if tracing:
-        tracer = KernelTracer("onlyregs_sf_attention_trace")
+        tracer = KernelTracer(trace_output_base(__file__, B, H, num_warps, schedule, trace_dir))
         tracer.attach(dev, compiled)
         total_cycles = dev.launch(compiled, alloc_Q, alloc_K, alloc_A, float(B), float(H))
         tracer.export()

@@ -64,7 +64,7 @@ class TestWarpScheduler(unittest.TestCase):
             np.testing.assert_array_equal(self.smsp.warps[w].regs[r_gtid.id], expected)
 
     def test_warp_switch_on_yield(self):
-        """Verify that YIELD causes a warp switch and incurs the 80-cycle context switch penalty."""
+        """YIELD switches resident warps; the current driver charges zero cycles."""
         kb = WarpKernel()
         r0 = kb.alloc_reg("r0")
         kb.asm("set.imm", r0, 5.0)
@@ -73,9 +73,9 @@ class TestWarpScheduler(unittest.TestCase):
         program = kb.get_program()
 
         cycles = self.smsp.run(program)
-        # Switching across 4 warps paying context switch costs
+        # Registers remain resident; legacy SRAM save/restore is disabled.
         self.assertGreater(self.smsp.context_switch_count, 0)
-        self.assertGreater(self.smsp.total_context_switch_cycles, 0)
+        self.assertEqual(self.smsp.total_context_switch_cycles, 0)
         for w in range(4):
             self.assertTrue(np.all(self.smsp.warps[w].regs[r0.id] == 10.0))
 

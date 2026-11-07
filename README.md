@@ -1,17 +1,58 @@
-# pGPU Simulator 
+**CS6023 course project - pGPU Attention**
 
-`pGPU` is a simulator for a minimal GPU-like device, entirely in Python, with its own mini-ISA, DRAM, Scratch, Register-File and SM models. 
+Attention-score matrix computation on the CPU-based pGPU simulator:
 
-## Problem Description
+```text
+A[b, h] = softmax(Q[b, h] @ K[b].T / sqrt(32))
+```
 
-The target problem is to implement a kernel in pGPU's software framework to compute the attention map between two matrices:
+Q has shape `(B, H, 8, 32)`, K has shape `(B, 8, 32)`, and A has shape
+`(B, H, 8, 8)`. 
 
-$$\text{Output} = \text{softmax}\left(\frac{Q K^\top}{\sqrt{d}}\right)$$
+The problem workload is B=16, H=64 with four warps.
 
-<More details to follow>
+### setup:
+python 3.10+, from the repository root:
 
-## Setup Instructions
+```sh
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+```
 
-## Simulator Docs
+### running:
+the launcher reports simulated cycles and checks correctness against a reference numpy baseline:
 
-Watch this space!
+```sh
+python -m pgpu.attention.launcher --list-kernels
+python -m pgpu.attention.launcher --kernel onlyregs_softmax -B 16 -H 64 -W 4
+```
+
+Available kernels are: `baseline`, `onlyregs`, and `onlyregs_softmax`, each is a product of successive iteration.
+
+Add `--schedule` to enable instruction
+reordering, by a custom scheduling engine which should hopefully decrease cycle counts under the specificed workloads. It is off by default. 
+
+Use `--help` for input controls and other options.
+
+Correctness failures return a nonzero exit code.
+
+### tests:
+
+```sh
+python -m unittest discover -s pgpu/tests -v
+python -m unittest discover -s pgpu/tests/pGPUInfra -v
+```
+
+### tracing:
+json and html are saved under `artifacts/traces/`:
+```sh
+python -m pgpu.attention.launcher --kernel onlyregs_softmax -B 1 -H 1 -W 1 --trace
+python -m pgpu.devtools.summary artifacts/traces/onlyregs_softmax_B1_H1_W1_schedule0.json
+```
+
+See [the project description](docs/ATTENTION_ASM.md) for architecture and ISA
+details. 
+
+Original simulator and documentation by Arjun Vadakkeveedu
+([upstream pGPU](https://github.com/arjunmenonv/pGPU)).

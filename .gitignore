@@ -1,4 +1,12 @@
-**/__pycache__/**
-design/*
-**/*.json
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+design/
+artifacts/
+*_trace.json
+*_trace.html
+*.kate-swp
+*.swp
+.pytest_cache/
 
